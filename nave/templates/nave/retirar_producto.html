@@ -1,0 +1,576 @@
+{% extends 'nave/base.html' %}
+{% block content %}
+<div class="container">
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% endif %}">
+                {{ message|linebreaksbr }}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="left-column">
+        <div class="warehouse-grid-container">
+            <h2>Cuadrícula de Estanterías</h2>
+            <table id="warehouse-grid">
+                {% for row in rows %}
+                    <tr>
+                        {% for column in columns %}
+                            {% for shelf in shelves %}
+                                {% if shelf.row == row and shelf.column == column %}
+                                    {% if shelf.is_active %}
+                                        <td class="grid-cell active-shelf {% if shelf.id == level.shelf.id %}current-shelf{% endif %}" 
+                                            data-row="{{ row }}" 
+                                            data-column="{{ column }}">
+                                            <a href="{% url 'shelf_info' shelf.id %}">Ver Información</a>
+                                            <h2>{{ shelf.identifier }}</h2>
+                                        </td>
+                                    {% else %}
+                                        <td class="grid-cell inactive-shelf" style="visibility: hidden;">
+                                            <h2>{{ shelf.identifier }}</h2>
+                                        </td>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <div class="form-container">
+            <h2>Retirar Producto del Nivel {{ level.floor_number }} - Estante {{ level.shelf.identifier }}</h2>
+            <form method="POST">
+                {% csrf_token %}
+                <label for="item_id">Seleccionar Producto:</label>
+                <select name="item_id" id="item_id" required>
+                    <option value="">--Seleccione un Producto--</option>
+                    <optgroup label="Items Regulares">
+                        {% for item in inventory_items %}
+                            <option value="{{ item.id }}" data-type="regular">
+                                {{ item.product_name }} - Cantidad: {{ item.quantity }}
+                                {% if item.weight %} - Peso: {{ item.weight }}{% endif %}
+                                {% if item.volume %} - Volumen: {{ item.volume }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Items Distribuidos">
+                        {% for item in distributed_items %}
+                            <option value="{{ item.id }}" data-type="distributed">
+                                {{ item.movement_item.product_type.name }} - Cantidad: {{ item.quantity }}
+                                {% if item.weight %} - Peso: {{ item.weight }}{% endif %}
+                                {% if item.volume %} - Volumen: {{ item.volume }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+
+                <label for="quantity">Cantidad a Retirar:</label>
+                <input type="number" name="quantity" id="quantity" min="1" required>
+
+                <label for="action">Acción:</label>
+                <select name="action" id="action" required>
+                    <option value="">--Seleccione una Acción--</option>
+                    <option value="transfer_within">Transferir dentro del Almacén</option>
+                    <option value="transfer_warehouse">Transferir a Otro Almacén</option>
+                    <option value="transfer_section">Transferir a una Sección Específica</option>
+                </select>
+
+                <div id="destination_field" style="display:none;">
+                    <label for="destination">Destino:</label>
+                    <select name="destination" id="destination" required>
+                        <!-- Las opciones se cargarán dinámicamente -->
+                        {% for warehouse in warehouses %}
+                            <option value="{{ warehouse.id }}">{{ warehouse.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit">Registrar Movimiento</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="occupancy-info-container">
+        <h2>Disponibilidad de Estanterías</h2>
+        <div class="occupancy-grid">
+            {% for shelf_data in shelf_occupancy %}
+                <div class="occupancy-card {% if shelf_data.status == 'empty' %}empty-shelf{% elif shelf_data.status == 'low' %}low-occupancy{% elif shelf_data.status == 'medium' %}medium-occupancy{% else %}high-occupancy{% endif %}">
+                    <h3>{{ shelf_data.shelf.identifier }}</h3>
+                    <div class="occupancy-details">
+                        <div class="progress-section">
+                            <label>Ocupación por Peso:</label>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: {{ shelf_data.weight_occupancy|floatformat:1 }}%">
+                                    {{ shelf_data.weight_occupancy|floatformat:1 }}%
+                                </div>
+                            </div>
+                            <span>Disponible: {{ shelf_data.available_weight|floatformat:2 }} kg</span>
+                        </div>
+                        
+                        <div class="progress-section">
+                            <label>Ocupación por Volumen:</label>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: {{ shelf_data.volume_occupancy|floatformat:1 }}%">
+                                    {{ shelf_data.volume_occupancy|floatformat:1 }}%
+                                </div>
+                            </div>
+                            <span>Disponible: {{ shelf_data.available_volume|floatformat:2 }} m³</span>
+                        </div>
+
+                        <div class="levels-info">
+                            <h4>Niveles:</h4>
+                            <ul>
+                                {% for level_info in shelf_data.levels_info %}
+                                    <li>Nivel {{ level_info.level.floor_number }}: 
+                                        {{ level_info.items_count }} items
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="right-column">
+        <div class="shelf-inventory-container">
+            <h2>Inventario de la Estantería {{ level.shelf.identifier }}</h2>
+            {% for level_info in shelf_inventory %}
+                <div class="level-section">
+                    <h3>Nivel {{ level_info.level_number }}</h3>
+                    
+                    {% if level_info.regular_items or level_info.distributed_items %}
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Producto</th>
+                                    <th>Cantidad</th>
+                                    <th>Peso</th>
+                                    <th>Volumen</th>
+                                    <th>Tipo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in level_info.regular_items %}
+                                    <tr>
+                                        <td>{{ item.code|default:"N/A" }}</td>
+                                        <td>{{ item.name }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td>{{ item.weight|default:"N/A" }}</td>
+                                        <td>{{ item.volume|default:"N/A" }}</td>
+                                        <td><span class="badge badge-primary">Regular</span></td>
+                                    </tr>
+                                {% endfor %}
+                                {% for item in level_info.distributed_items %}
+                                    <tr>
+                                        <td>{{ item.code|default:"N/A" }}</td>
+                                        <td>{{ item.name }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td>{{ item.weight|default:"N/A" }}</td>
+                                        <td>{{ item.volume|default:"N/A" }}</td>
+                                        <td><span class="badge badge-info">Distribuido</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No hay productos en este nivel</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="distribution-info-container">
+            <h2>Historial de Movimientos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Ubicación</th>
+                        <th>Destino/Origen</th>
+                        <th>Fecha y Hora</th>
+                        <th>Tipo</th>
+                        <th>Detalles</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for distribution in distribution_info %}
+                    <tr>
+                        <td>{{ distribution.product_code|default:"N/A" }}</td>
+                        <td>{{ distribution.product_name }}</td>
+                        <td>{{ distribution.quantity }} unidades</td>
+                        <td>{{ distribution.shelf }} - Nivel {{ distribution.floor }}</td>
+                        <td>
+                            {% if distribution.origin == 'INTERNAL_TRANSFER' %}
+                                Desde: {{ distribution.source_shelf }} - Nivel {{ distribution.source_level }}
+                            {% elif distribution.origin == 'OUTGOING_TRANSFER' %}
+                                Hacia: {{ distribution.destination_shelf }} - Nivel {{ distribution.destination_level }}
+                            {% else %}
+                                Recepción inicial
+                            {% endif %}
+                        </td>
+                        <td>{{ distribution.timestamp|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if distribution.origin == 'RECEPTION' %}
+                                <span class="badge badge-primary">Recepción Inicial</span>
+                            {% elif distribution.origin == 'OUTGOING_TRANSFER' %}
+                                <span class="badge badge-warning">Salida</span>
+                            {% else %}
+                                <span class="badge badge-info">Entrada</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ distribution.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .warehouse-grid-container {
+        margin: 40px 0;
+    }
+
+    .container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: flex-start;
+        gap: 40px;
+        padding: 20px;
+    }
+
+    #warehouse-grid {
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    .grid-cell {
+        border: 1px solid #ccc;
+        width: 100px;
+        height: 100px;
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+        padding: 10px;
+    }
+
+    .active-shelf {
+        background-color: #e3f2fd;
+        border: 2px solid #2196f3;
+    }
+
+    .current-shelf {
+        background-color: #bbdefb;
+        border: 2px solid #1976d2;
+    }
+
+    .inactive-shelf {
+        background-color: #f5f5f5;
+    }
+
+    /* Estilos del formulario */
+    form {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        max-width: 500px;
+    }
+
+    label {
+        display: block;
+        margin: 15px 0 5px;
+        font-weight: bold;
+    }
+
+    select, input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    button[type="submit"] {
+        background-color: #2196f3;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    button[type="submit"]:hover {
+        background-color: #1976d2;
+    }
+
+    h2 {
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .messages {
+        margin: 20px 0;
+    }
+    
+    .alert {
+        padding: 15px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+    
+    .alert-success {
+        color: #155724;
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+    }
+    
+    .alert-error {
+        color: #721c24;
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+    }
+
+    /* Estilos para la tabla de distribuciones */
+    .distribution-info-container {
+        margin-top: 40px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f2f2f2;
+    }
+
+    .badge {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: normal;
+    }
+
+    .badge-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .badge-info {
+        background-color: #17a2b8;
+        color: white;
+    }
+
+    .badge-warning {
+        background-color: #ffc107;
+        color: #000;
+    }
+
+    .shelf-inventory-container {
+        margin: 20px 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .level-section {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: white;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .inventory-table {
+        width: 100%;
+        margin-top: 10px;
+        border-collapse: collapse;
+    }
+
+    .inventory-table th,
+    .inventory-table td {
+        padding: 8px;
+        border: 1px solid #dee2e6;
+    }
+
+    .inventory-table th {
+        background-color: #f8f9fa;
+    }
+
+    /* Agregar estilos para los mensajes */
+    .messages-container {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    .alert {
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+
+    .alert-success {
+        color: #155724;
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+    }
+
+    .alert-danger {
+        color: #721c24;
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+    }
+
+    /* Estilo para preservar los saltos de línea en los mensajes */
+    .alert {
+        white-space: pre-line;
+    }
+
+    .occupancy-info-container {
+        margin: 20px 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .occupancy-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .occupancy-card {
+        padding: 15px;
+        border-radius: 8px;
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .empty-shelf {
+        border-left: 5px solid #28a745;
+    }
+
+    .low-occupancy {
+        border-left: 5px solid #17a2b8;
+    }
+
+    .medium-occupancy {
+        border-left: 5px solid #ffc107;
+    }
+
+    .high-occupancy {
+        border-left: 5px solid #dc3545;
+    }
+
+    .progress-section {
+        margin: 10px 0;
+    }
+
+    .progress {
+        height: 20px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        margin: 5px 0;
+    }
+
+    .progress-bar {
+        height: 100%;
+        max-width: 100%;
+        background-color: #007bff;
+        border-radius: 4px;
+        color: white;
+        text-align: center;
+        line-height: 20px;
+        transition: width 0.3s ease;
+    }
+
+    .levels-info {
+        margin-top: 15px;
+    }
+
+    .levels-info ul {
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .levels-info li {
+        padding: 5px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+    /* Colores para las barras de progreso según ocupación */
+    .empty-shelf .progress-bar {
+        background-color: #28a745;
+    }
+
+    .low-occupancy .progress-bar {
+        background-color: #17a2b8;
+    }
+
+    .medium-occupancy .progress-bar {
+        background-color: #ffc107;
+    }
+
+    .high-occupancy .progress-bar {
+        background-color: #dc3545;
+    }
+</style>
+
+<script>
+document.getElementById('action').addEventListener('change', function() {
+    var action = this.value;
+    var destinationField = document.getElementById('destination_field');
+    var destinationSelect = document.getElementById('destination');
+
+    destinationSelect.innerHTML = '';
+    
+    if (action) {
+        destinationField.style.display = 'block';
+        
+        if (action === 'transfer_within' || action === 'transfer_section') {
+            {% for level in warehouse_levels %}
+                {% if level.shelf.is_active %}
+                var option = document.createElement('option');
+                option.value = "{{ level.id }}";
+                option.text = "Nivel {{ level.floor_number }} - Estante {{ level.shelf.identifier }}";
+                destinationSelect.add(option);
+                {% endif %}
+            {% endfor %}
+        } else if (action === 'transfer_warehouse') {
+            {% for warehouse in warehouses %}
+                var option = document.createElement('option');
+                option.value = "{{ warehouse.id }}";
+                option.text = "{{ warehouse.name }}";
+                destinationSelect.add(option);
+            {% endfor %}
+        }
+    } else {
+        destinationField.style.display = 'none';
+    }
+});
+</script>
+{% endblock %} 

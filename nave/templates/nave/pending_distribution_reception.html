@@ -1,0 +1,105 @@
+{% extends 'nave/base.html' %}
+{% block content %}
+    <h1>Recepciones</h1>
+    <div class="reception-container">
+        <div class="pending-receptions">
+            <h2>Recepciones Pendientes</h2>
+            <ul class="reception-list">
+                {% for reception in pending_receptions %}
+                    <li class="reception-item">
+                        <a href="{% url 'pending_distribution_items' reception.id %}">{{ reception.supplier.name }} - {{ reception.warehouse.name }} - {{ reception.timestamp|date:"d/m/Y H:i" }}</a>
+                        <ul class="item-list">
+                            {% for item in reception.items.all %}
+                                <li class="item">{{ item.product_type.name }} (Código: {{ item.product_type.codigo }}): {{ item.quantity }} unidades</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="distributed-receptions">
+            <h2>Recepciones Distribuidas</h2>
+            <ul class="reception-list">
+                {% for reception in distributed_receptions %}
+                    <li class="reception-item">
+                        <a href="{% url 'pending_distribution_items' reception.id %}">{{ reception.supplier.name }} - {{ reception.warehouse.name }} - {{ reception.timestamp|date:"d/m/Y H:i" }}</a>
+                        <ul class="item-list">
+                            {% for item in reception.items.all %}
+                                <li class="item">
+                                    {{ item.product_type.name }} (Código: {{ item.product_type.codigo }}): {{ item.quantity }} unidades
+                                    <ul class="distribution-list">
+                                        {% for dist in item.distributions %}
+                                            <li>Distribuido a: Estante {{ dist.level.shelf.identifier }} - Nivel {{ dist.level.floor_number }} (Cantidad: {{ dist.quantity }})</li>
+                                        {% endfor %}
+                                    </ul>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .reception-container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .pending-receptions, .distributed-receptions {
+            width: 48%; /* Ajusta el ancho de las columnas */
+        }
+
+        .reception-list {
+            padding: 0;
+        }
+
+        .reception-item {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            padding: 15px;
+            transition: transform 0.2s;
+        }
+
+        .reception-item:hover {
+            transform: scale(1.02);
+        }
+
+        a {
+            text-decoration: none;
+            color: #007BFF;
+            font-weight: bold;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: #0056b3;
+        }
+
+        .item-list, .distribution-list {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+
+        .item {
+            background: #e9ecef;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 5px;
+        }
+    </style>
+{% endblock %}

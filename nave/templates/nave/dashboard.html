@@ -1,0 +1,52 @@
+{% extends 'nave/base.html' %}
+{% block content %}
+    <h1>Almacenes Disponibles</h1>
+    <ul>
+        {% for warehouse in warehouses %}
+            <li><a href="{% url 'warehouse_detail' warehouse.id %}">{{ warehouse.name }}</a></li>
+        {% endfor %}
+    </ul>
+    <a class="register-link" href="{% url 'register_warehouse' %}">Registrar Almacén</a>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: #fff;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        a {
+            text-decoration: none;
+            color: #5cb85c;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .register-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 15px;
+            background-color: #5cb85c;
+            color: white;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        .register-link:hover {
+            background-color: #4cae4c;
+        }
+    </style>
+{% endblock %}
+    

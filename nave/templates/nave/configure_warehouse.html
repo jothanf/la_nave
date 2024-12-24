@@ -1,0 +1,255 @@
+{% extends 'nave/base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+    <h1>Configurar Almacén: {{ warehouse.name }}</h1>
+    
+    <!-- Agregar formulario de dimensiones -->
+    <div class="grid-dimensions-form">
+        <h3>Modificar dimensiones de la cuadrícula</h3>
+        <form method="POST" onsubmit="return confirmGridUpdate()">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_grid">
+            
+            <label for="rows">Número de filas:</label>
+            <input type="number" id="rows" name="rows" min="1" value="{{ grid.rows }}" required>
+            
+            <label for="columns">Número de columnas:</label>
+            <input type="number" id="columns" name="columns" min="1" value="{{ grid.columns }}" required>
+            
+            <button type="submit">Actualizar dimensiones</button>
+        </form>
+    </div>
+
+    <a href="{% url 'warehouse_detail' warehouse.id %}">Regresar a la Vista del Almacén</a>
+ 
+    <h2>Cuadrícula del Almacén</h2>
+    <div id="warehouse-grid-container">
+        <table id="warehouse-grid">
+            {% for row in rows %}
+                <tr>
+                    {% for column in columns %}
+                        {% for shelf in shelves %}
+                            {% if shelf.row == row and shelf.column == column %}
+                                {% if shelf.is_active %}
+                                    <td class="grid-cell active-shelf" 
+                                        data-row="{{ row }}" 
+                                        data-column="{{ column }}" 
+                                        onclick="openPopup('{{ row }}', '{{ column }}')">
+                                        <h2>{{ shelf.identifier }}</h2>
+                                        <p class="shelf-status">
+                                        
+                                    </p>
+                                </td>
+                                {% else %}
+                                    <td class="grid-cell inactive-shelf" 
+                                        data-row="{{ row }}" 
+                                        data-column="{{ column }}" 
+                                        onclick="openPopup('{{ row }}', '{{ column }}')">
+                                        <h2>{{ shelf.identifier }}</h2>
+                                        <p class="shelf-status">
+                                            (Inactivo)
+                                        </p>
+                                    </td>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+        <div>
+            <!-- Pop-up para crear/eliminar estante -->
+            <div id="shelf-popup" style="display:none;">
+                <h3>Gestionar Estante</h3>
+                <form id="shelf-form" method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" id="shelf-row" name="row">
+                    <input type="hidden" id="shelf-column" name="column">
+                    <input type="hidden" name="action" value="toggle">
+                    <p id="shelf-status-text"></p>
+                    
+                    <!-- Campo para el identificador -->
+                    <label for="identifier">Identificador:</label>
+                    <input type="text" id="identifier" name="identifier" required>
+                    
+                    <button type="submit" id="toggle-button"></button>
+                    <button type="button" onclick="closePopup()">Cerrar</button>
+                    <button type="button" onclick="updateShelf()">Actualizar Estante</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #warehouse-grid-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+        .selected {
+            background-color: yellow; 
+        }
+        .grid-cell {
+            border: 1px solid #ccc;
+            width: 100px;
+            height: 100px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            cursor: pointer;
+        }
+        .active-shelf {
+            background-color: #e3f2fd; 
+            border: 2px solid #2196f3; 
+        }
+        .inactive-shelf {
+            background-color: #f8d7da;  
+        }
+        .grid-dimensions-form {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .grid-dimensions-form input[type="number"] {
+            width: 80px;
+            margin: 0 10px;
+        }
+    </style>
+
+    <script>
+        const warehouseId = '{{ warehouse.id }}';
+
+        function openPopup(row, column) {
+            const cell = document.querySelector(`[data-row="${row}"][data-column="${column}"]`);
+            const isActive = cell.classList.contains('active-shelf');
+            
+            document.getElementById('shelf-row').value = row;
+            document.getElementById('shelf-column').value = column;
+            
+            // Actualizar texto y botón según el estado
+            const statusText = document.getElementById('shelf-status-text');
+            const toggleButton = document.getElementById('toggle-button');
+            const identifierInput = document.getElementById('identifier');
+            
+            if (isActive) {
+                statusText.textContent = 'Este estante está activo';
+                toggleButton.textContent = 'Desactivar Estante';
+                identifierInput.value = cell.querySelector('h2').textContent; // Asignar el identificador actual
+            } else {
+                statusText.textContent = 'Este estante está inactivo';
+                toggleButton.textContent = 'Activar Estante';
+                identifierInput.value = ''; // Limpiar el campo si está inactivo
+            }
+            
+            document.getElementById('shelf-popup').style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('shelf-popup').style.display = 'none';
+        }
+
+        function createShelf() {
+            const row = document.getElementById('shelf-row').value;
+            const column = document.getElementById('shelf-column').value;
+            const identifier = document.getElementById('identifier').value;
+
+            // Aquí puedes agregar la lógica para crear el estante
+            console.log(`Crear estante en (${row}, ${column}) con identificador: ${identifier}`);
+            closePopup();
+        }
+
+        function deactivateShelf(shelfId) {
+            const shelf = shelfId
+            console.log(`Desactivar estante en (${row}, ${column}) con ID: ${shelfId}`);
+            closePopup();
+        }
+
+        function toggleShelf(row, column) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{% url 'configure_warehouse' warehouse.id %}";
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            
+            const rowInput = document.createElement('input');
+            rowInput.type = 'hidden';
+            rowInput.name = 'row';
+            rowInput.value = row;
+            
+            const columnInput = document.createElement('input');
+            columnInput.type = 'hidden';
+            columnInput.name = 'column';
+            columnInput.value = column;
+            
+            form.appendChild(csrfInput);
+            form.appendChild(rowInput);
+            form.appendChild(columnInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        function updateShelf() {
+            const row = document.getElementById('shelf-row').value;
+            const column = document.getElementById('shelf-column').value;
+            const identifier = document.getElementById('identifier').value;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{% url 'configure_warehouse' warehouse.id %}";
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+
+            const rowInput = document.createElement('input');
+            rowInput.type = 'hidden';
+            rowInput.name = 'row';
+            rowInput.value = row;
+
+            const columnInput = document.createElement('input');
+            columnInput.type = 'hidden';
+            columnInput.name = 'column';
+            columnInput.value = column;
+
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'update';  // Establecer la acción como 'update'
+
+            const identifierInput = document.createElement('input');
+            identifierInput.type = 'hidden';
+            identifierInput.name = 'identifier';
+            identifierInput.value = identifier;
+
+            form.appendChild(csrfInput);
+            form.appendChild(rowInput);
+            form.appendChild(columnInput);
+            form.appendChild(actionInput);
+            form.appendChild(identifierInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Agregar función de confirmación
+        function confirmGridUpdate() {
+            return confirm('¿Está seguro de que desea modificar las dimensiones de la cuadrícula? Los estantes existentes se mantendrán.');
+        }
+
+    </script>
+
+    {% if message %}
+        <div class="alert">
+            {{ message }}
+        </div>
+    {% endif %}
+{% endblock %}

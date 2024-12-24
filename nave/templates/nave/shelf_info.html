@@ -1,0 +1,121 @@
+{% extends 'nave/base.html' %}
+{% block content %}
+<style>
+    .shelf-title {
+        font-size: 24px;
+        color: #333;
+        margin-bottom: 20px;
+    }
+    .levels-title {
+        font-size: 20px;
+        color: #555;
+        margin-top: 20px;
+    }
+    .levels-list {
+        list-style-type: none;
+        padding: 0;
+    }
+    .level-item {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        margin: 10px 0;
+        padding: 10px;
+        transition: background-color 0.3s;
+    }
+    .level-item:hover {
+        background-color: #e9ecef;
+    }
+    .enter-product {
+        color: #007bff;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    .enter-product:hover {
+        text-decoration: underline;
+    }
+    .items-list {
+        margin-top: 10px;
+        padding-left: 0;
+        width: 100%;
+    }
+    .items-header {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+        padding: 10px;
+        background-color: #f0f0f0;
+        font-weight: bold;
+        border-bottom: 2px solid #ddd;
+    }
+    .item {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+        padding: 8px;
+        border-bottom: 1px solid #ddd;
+        align-items: center;
+    }
+    .item:hover {
+        background-color: #f8f9fa;
+    }
+    .no-items {
+        color: #999;
+        font-style: italic;
+    }
+</style>
+<h2 class="shelf-title">Información del Estante: {{ shelf.identifier }}</h2>
+<p class="levels-title">Niveles:</p>
+<ul class="levels-list">
+    {% for info in levels_info %}
+    <li class="level-item">Nivel {{ info.level.floor_number }}:
+        <a class="enter-product" href="">Ingresar Producto</a>
+        <button onclick="window.location.href='{% url 'retirar_producto' level_id=info.level.id %}'">Retirar Producto</button>
+
+        <ul class="items-list">
+            {% if info.regular_items or info.distributed_items %}
+                <li class="items-header">
+                    <span>Producto</span>
+                    <span>Código</span>
+                    <span>Cantidad</span>
+                    <span>Fecha</span>
+                    <span>Origen</span>
+                </li>
+                {% for item in info.regular_items %}
+                    <li class="item">
+                        <span>{{ item.product_name }}</span>
+                        <span>{{ item.product_type.codigo }}</span>
+                        <span>{{ item.quantity }}</span>
+                        <span>{{ item.received_date }}</span>
+                        <span>
+                            {% if item.internal_movement %}
+                                Estante {{ item.internal_movement.source_shelf_identifier }} - 
+                                Nivel {{ item.internal_movement.source_level_number }}
+                            {% else %}
+                                Recepción Inicial
+                            {% endif %}
+                        </span>
+                    </li>
+                {% endfor %}
+                {% for dist in info.distributed_items %}
+                    <li class="item">
+                        <span>{{ dist.movement_item.product_type.name }}</span>
+                        <span>{{ dist.movement_item.product_type.codigo }}</span>
+                        <span>{{ dist.quantity }}</span>
+                        <span>{{ dist.timestamp }}</span>
+                        <span>
+                            {% if dist.internal_movement %}
+                                Estante {{ dist.internal_movement.source_shelf_identifier }} - 
+                                Nivel {{ dist.internal_movement.source_level_number }}
+                            {% else %}
+                                Recepción Inicial
+                            {% endif %}
+                        </span>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li class="no-items">No hay artículos almacenados en este nivel.</li>
+            {% endif %}
+        </ul>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

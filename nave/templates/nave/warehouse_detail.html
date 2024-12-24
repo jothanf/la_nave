@@ -1,0 +1,340 @@
+{% extends 'nave/base.html' %}
+{% block content %}
+<div class="container">
+    <div class="left-column">
+        <h1>{{ warehouse.name }}</h1>
+        <p>Ubicación: {{ warehouse.location }}</p>
+        <p>Tamaño: {{ warehouse.size }}</p>
+        <a href="{% url 'configure_warehouse' warehouse.id %}" class="btn btn-primary">Configurar Almacén</a>
+
+        <h2>Cuadrícula de Estanterías</h2>
+        <table id="warehouse-grid">
+            {% for row in rows %}
+                <tr>
+                    {% for column in columns %}
+                        <td class="grid-cell 
+                            {% for shelf in shelves %}
+                                {% if shelf.row == row and shelf.column == column %}
+                                    {% if shelf.is_active %}
+                                        active-shelf
+                                    {% else %}
+                                        inactive-shelf
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}"
+                            data-row="{{ row }}" 
+                            data-column="{{ column }}">
+                            {% for shelf in shelves %}
+                                {% if shelf.row == row and shelf.column == column %}
+                                    {% if shelf.is_active %}
+                                        <a href="{% url 'shelf_info' shelf.id %}">Ver Información</a>
+                                    {% endif %}
+                                    <h2></h2>
+                                {% endif %}
+                            {% endfor %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <div class="right-column">
+        <div class="warehouse-summary">
+            <h2>Resumen del Almacén</h2>
+            
+            <!-- Resumen de Productos en Existencia -->
+            <div class="summary-section">
+                <h3>Inventario Total</h3>
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Proveedor</th>
+                            <th>Cantidad</th>
+                            <th>Peso</th>
+                            <th>Volumen</th>
+                            <th>Última Recepción</th>
+                            <th>Ubicación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory_items %}
+                            <tr>
+                                <td>{{ item.product_type__codigo|default:"N/A" }}</td>
+                                <td>{{ item.product_name }}</td>
+                                <td>{{ item.supplier__name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.weight|default:"N/A" }}</td>
+                                <td>{{ item.volume|default:"N/A" }}</td>
+                                <td>{{ item.last_received|date:"d/m/Y H:i" }}</td>
+                                <td>{{ item.level__shelf__identifier }} Nivel {{ item.level__floor_number }}</td>
+                            </tr>
+                        {% endfor %}
+                        {% for item in distributed_items %}
+                            <tr>
+                                <td>{{ item.movement_item__product_type__codigo|default:"N/A" }}</td>
+                                <td>{{ item.product_name }}</td>
+                                <td>{{ item.supplier_name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.weight|default:"N/A" }}</td>
+                                <td>{{ item.volume|default:"N/A" }}</td>
+                                <td>{{ item.last_received|date:"d/m/Y H:i" }}</td>
+                                <td>{{ item.level__shelf__identifier }} Nivel {{ item.level__floor_number }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="total-row">
+                            <td colspan="3"><strong>Total</strong></td>
+                            <td><strong>{{ total_quantity }}</strong></td>
+                            <td><strong>{{ total_weight }}</strong></td>
+                            <td><strong>{{ total_volume }}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Recepciones Pendientes -->
+            <div class="summary-section">
+                <h3>Recepciones Pendientes de Distribución</h3>
+                <table class="pending-table">
+                    <thead>
+                        <tr>
+                            <th>Proveedor</th>
+                            <th>Productos</th>
+                            <th>Fecha de Recepción</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reception in pending_receptions %}
+                            <tr>
+                                <td>{{ reception.supplier.name }}</td>
+                                <td>
+                                    {% for item in reception.items.all %}
+                                        {{ item.product_type.name }} ({{ item.quantity }} unidades)<br>
+                                    {% endfor %}
+                                </td>
+                                <td>{{ reception.timestamp|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'pending_distribution_items' reception.id %}" 
+                                       class="btn btn-primary btn-sm">Distribuir</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Ocupación de Estantes -->
+            <div class="summary-section">
+                <h3>Ocupación de Estantes</h3>
+                <table class="occupancy-table">
+                    <thead>
+                        <tr>
+                            <th>Estante</th>
+                            <th>Niveles</th>
+                            <th>Items Totales</th>
+                            <th>Peso Total (kg)</th>
+                            <th>Volumen Total (m³)</th>
+                            <th>Ocupación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for shelf in shelf_occupancy %}
+                            <tr class="occupancy-row {{ shelf.status }}">
+                                <td>{{ shelf.shelf.identifier }}</td>
+                                <td>{{ shelf.levels_count }}</td>
+                                <td>{{ shelf.total_items|default:"0" }}</td>
+                                <td>{{ shelf.total_weight|default:"0"|floatformat:2 }}</td>
+                                <td>{{ shelf.total_volume|default:"0"|floatformat:2 }}</td>
+                                <td>
+                                    <div class="occupancy-bar">
+                                        <div class="occupancy-fill" style="width: {{ shelf.occupancy_percentage|floatformat:0 }}%"></div>
+                                        <span>{{ shelf.occupancy_percentage|floatformat:0 }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .container {
+        display: flex;
+        justify-content: space-between;
+        padding: 20px;
+    }
+
+    .left-column {
+        width: 33.33%;
+    }
+
+    .right-column {
+        width: 66.67%;
+    }
+
+    .warehouse-summary {
+        margin: 20px 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .summary-section {
+        margin-bottom: 20px;
+    }
+
+    .inventory-table, .pending-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .inventory-table th,
+    .pending-table th {
+        background-color: #f2f2f2;
+        padding: 10px;
+        text-align: left;
+    }
+
+    .inventory-table td,
+    .pending-table td {
+        padding: 10px;
+        border: 1px solid #dee2e6;
+    }
+
+    .total-row {
+        background-color: #e9ecef;
+        font-weight: bold;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+    }
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+
+    #warehouse-grid {
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
+
+    .grid-cell {
+        border: 1px solid #ccc;
+        width: 100px;
+        height: 100px;
+        text-align: center;
+        font-size: 12px;
+        padding: 10px;
+    }
+
+    .active-shelf {
+        background-color: #e3f2fd;
+        border: 2px solid #2196f3;
+    }
+
+    .inactive-shelf {
+        background-color: #f5f5f5;
+        opacity: 0.5;
+        border: 1px dashed #ccc;
+        color: #999;
+    }
+
+    .current-shelf {
+        background-color: #bbdefb;
+        border: 2px solid #1976d2;
+    }
+
+    .occupancy-table {
+        width: 100%;
+        margin-top: 20px;
+        border-collapse: collapse;
+    }
+
+    .occupancy-table th,
+    .occupancy-table td {
+        padding: 12px;
+        text-align: left;
+        border: 1px solid #dee2e6;
+    }
+
+    .occupancy-row {
+        transition: background-color 0.3s;
+    }
+
+    .occupancy-row:hover {
+        background-color: rgba(0,0,0,0.05);
+    }
+
+    .occupancy-row.empty {
+        background-color: #e8f5e9;
+    }
+
+    .occupancy-row.low {
+        background-color: #f1f8e9;
+    }
+
+    .occupancy-row.medium {
+        background-color: #fff3e0;
+    }
+
+    .occupancy-row.high {
+        background-color: #ffebee;
+    }
+
+    .occupancy-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .occupancy-fill {
+        height: 100%;
+        background-color: #4caf50;
+        transition: width 0.3s ease;
+    }
+
+    .empty .occupancy-fill {
+        background-color: #81c784;
+    }
+
+    .low .occupancy-fill {
+        background-color: #aed581;
+    }
+
+    .medium .occupancy-fill {
+        background-color: #ffd54f;
+    }
+
+    .high .occupancy-fill {
+        background-color: #ef5350;
+    }
+
+    .occupancy-bar span {
+        position: absolute;
+        width: 100%;
+        text-align: center;
+        color: #000;
+        font-weight: bold;
+        line-height: 20px;
+        text-shadow: 1px 1px 1px rgba(255,255,255,0.7);
+    }
+</style>
+
+{% endblock %}

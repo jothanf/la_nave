@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Agregar Artículo al Inventario</title>
+</head>
+<body>
+    <h1>Agregar Artículo al Nivel {{ level.floor_number }} de la Estantería {{ level.shelf.identifier }}</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Agregar</button>
+    </form>
+</body>
+</html> 

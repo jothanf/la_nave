@@ -1,0 +1,29 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nave</title>
+    <link rel="stylesheet" href="{% static 'styles/styles_base.css' %}">
+</head>
+<body>
+    <nav>
+        <a href="{% url 'dashboard' %}">| Dashboard |</a>
+        <a href="{% url 'register_warehouse' %}">| Registrar Almacén |</a>
+        <a href="{% url 'add_product_type' %}">| Agregar Tipo de Producto |</a>
+        <a href="{% url 'add_supplier' %}">| Agregar Provedor |</a>
+        <a href="{% url 'record_movement_in' %}">| Registrar ingreso |</a>
+        <a href="{% url 'record_movement_out' %}">| Registrar salida |</a>
+        <a href="{% url 'pending_distribution_reception' %}">| Pedidos recibidos|</a>
+        {% if user.is_authenticated %}
+            <a href="">| Cerrar Sesión |</a>
+        {% else %}
+            <a href="">| Iniciar Sesión |</a>
+                <a href="">| Registrarse |</a>
+        {% endif %}
+    </nav>
+    {% block content %}
+    {% endblock %}
+</body>
+</html>
